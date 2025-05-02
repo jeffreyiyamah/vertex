@@ -1,286 +1,174 @@
 "use client"
 
-import type React from "react"
-
-import { useEffect, useRef, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import * as THREE from "three"
-import {
-  ArrowRight,
-  Send,
-  Upload,
-  Search,
-  Filter,
-  Clock,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  BarChart2,
-} from "lucide-react"
-import { useRouter } from "next/navigation"
+import Logo from '@/Logo';
+import { useState } from "react"
+import { motion } from "framer-motion"
+import { Clock, AlertCircle, ChevronDown, ChevronUp, Search, Download, ExternalLink } from "lucide-react"
 import Link from "next/link"
 
-export default function LogViewerPage() {
-  const router = useRouter()
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number | null>(null)
-  const [question, setQuestion] = useState("")
-  const [response, setResponse] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+export default function LogNarrativePage() {
+  const [expandedSection, setExpandedSection] = useState<string | null>("what-happened")
   const [searchTerm, setSearchTerm] = useState("")
-  const [showFilters, setShowFilters] = useState(false)
-  const [selectedLog, setSelectedLog] = useState<string | null>("auth_logs_2025-04-14.json")
-  const [expandedLog, setExpandedLog] = useState<number | null>(null)
+  const [showTimeline, setShowTimeline] = useState(true)
 
-  // Sample log data
-  const logData = [
+  // Sample log data with importance flags
+  const logLines = [
     {
-      line: 1,
+      id: 1,
       timestamp: "2025-04-14T08:00:00Z",
-      userPrincipalName: "alice@example.com",
-      ipAddress: "192.168.1.10",
-      location: "New York, USA",
-      appDisplayName: "Office 365",
-      clientAppUsed: "Browser",
-      status: "Success",
-      failureReason: null,
+      content: "System startup completed successfully",
+      important: false,
     },
     {
-      line: 2,
+      id: 2,
       timestamp: "2025-04-14T08:01:15Z",
-      userPrincipalName: "bob@example.com",
-      ipAddress: "192.168.1.20",
-      location: "London, UK",
-      appDisplayName: "Azure Portal",
-      clientAppUsed: "Browser",
-      status: "Success",
-      failureReason: null,
+      content: "User bob@example.com logged in from 192.168.1.20 (London, UK)",
+      important: false,
     },
     {
-      line: 3,
+      id: 3,
       timestamp: "2025-04-14T08:02:34Z",
-      userPrincipalName: "charlie@example.com",
-      ipAddress: "192.168.1.30",
-      location: "Sydney, Australia",
-      appDisplayName: "Exchange Online",
-      clientAppUsed: "Mobile App",
-      status: "Failure",
-      failureReason: "Invalid credentials",
+      content:
+        "Failed login attempt for charlie@example.com from 192.168.1.30 (Sydney, Australia) - Invalid credentials",
+      important: true,
     },
     {
-      line: 4,
+      id: 4,
       timestamp: "2025-04-14T08:03:45Z",
-      userPrincipalName: "dana@example.com",
-      ipAddress: "192.168.1.40",
-      location: "Berlin, Germany",
-      appDisplayName: "Custom App",
-      clientAppUsed: "API",
-      status: "Success",
-      failureReason: null,
+      content: "User dana@example.com logged in from 192.168.1.40 (Berlin, Germany)",
+      important: false,
     },
     {
-      line: 5,
+      id: 5,
       timestamp: "2025-04-14T08:04:56Z",
-      userPrincipalName: "erin@example.com",
-      ipAddress: "192.168.1.50",
-      location: "Tokyo, Japan",
-      appDisplayName: "SharePoint",
-      clientAppUsed: "Desktop Client",
-      status: "Success",
-      failureReason: null,
+      content: "User erin@example.com logged in from 192.168.1.50 (Tokyo, Japan)",
+      important: false,
     },
     {
-      line: 6,
+      id: 6,
       timestamp: "2025-04-14T08:06:05Z",
-      userPrincipalName: "fred@example.com",
-      ipAddress: "192.168.1.60",
-      location: "Paris, France",
-      appDisplayName: "OneDrive",
-      clientAppUsed: "Browser",
-      status: "Success",
-      failureReason: null,
+      content: "User fred@example.com logged in from 192.168.1.60 (Paris, France)",
+      important: false,
     },
     {
-      line: 7,
+      id: 7,
       timestamp: "2025-04-14T08:07:15Z",
-      userPrincipalName: "gina@example.com",
-      ipAddress: "192.168.1.70",
-      location: "Toronto, Canada",
-      appDisplayName: "Teams",
-      clientAppUsed: "Mobile App",
-      status: "Failure",
-      failureReason: "Password expired",
+      content: "Failed login attempt for gina@example.com from 192.168.1.70 (Toronto, Canada) - Password expired",
+      important: true,
     },
     {
-      line: 8,
+      id: 8,
       timestamp: "2025-04-14T08:08:30Z",
-      userPrincipalName: "harry@example.com",
-      ipAddress: "192.168.1.80",
-      location: "Dublin, Ireland",
-      appDisplayName: "Azure Portal",
-      clientAppUsed: "Browser",
-      status: "Success",
-      failureReason: null,
+      content: "User harry@example.com logged in from 192.168.1.80 (Dublin, Ireland)",
+      important: false,
     },
     {
-      line: 9,
+      id: 9,
       timestamp: "2025-04-14T08:09:45Z",
-      userPrincipalName: "irene@example.com",
-      ipAddress: "192.168.1.90",
-      location: "Madrid, Spain",
-      appDisplayName: "Office 365",
-      clientAppUsed: "Desktop Client",
-      status: "Success",
-      failureReason: null,
+      content: "User irene@example.com logged in from 192.168.1.90 (Madrid, Spain)",
+      important: false,
     },
     {
-      line: 10,
+      id: 10,
       timestamp: "2025-04-14T08:10:55Z",
-      userPrincipalName: "jack@example.com",
-      ipAddress: "192.168.1.100",
-      location: "San Francisco, USA",
-      appDisplayName: "Power BI",
-      clientAppUsed: "Browser",
-      status: "Success",
-      failureReason: null,
+      content: "User jack@example.com logged in from 192.168.1.100 (San Francisco, USA)",
+      important: false,
     },
     {
-      line: 11,
+      id: 11,
       timestamp: "2025-04-14T08:12:05Z",
-      userPrincipalName: "kate@example.com",
-      ipAddress: "192.168.1.110",
-      location: "Amsterdam, Netherlands",
-      appDisplayName: "Dynamics 365",
-      clientAppUsed: "API",
-      status: "Failure",
-      failureReason: "MFA required",
+      content: "Failed login attempt for kate@example.com from 192.168.1.110 (Amsterdam, Netherlands) - MFA required",
+      important: true,
     },
     {
-      line: 12,
+      id: 12,
       timestamp: "2025-04-14T08:13:20Z",
-      userPrincipalName: "leo@example.com",
-      ipAddress: "192.168.1.120",
-      location: "Rome, Italy",
-      appDisplayName: "SharePoint",
-      clientAppUsed: "Browser",
-      status: "Success",
-      failureReason: null,
+      content: "User leo@example.com logged in from 192.168.1.120 (Rome, Italy)",
+      important: false,
     },
     {
-      line: 13,
+      id: 13,
       timestamp: "2025-04-14T08:14:35Z",
-      userPrincipalName: "mia@example.com",
-      ipAddress: "192.168.1.130",
-      location: "Vienna, Austria",
-      appDisplayName: "Office 365",
-      clientAppUsed: "Mobile App",
-      status: "Success",
-      failureReason: null,
+      content: "User mia@example.com logged in from 192.168.1.130 (Vienna, Austria)",
+      important: false,
     },
     {
-      line: 14,
+      id: 14,
       timestamp: "2025-04-14T08:15:50Z",
-      userPrincipalName: "nick@example.com",
-      ipAddress: "192.168.1.140",
-      location: "Zurich, Switzerland",
-      appDisplayName: "Azure Portal",
-      clientAppUsed: "Desktop Client",
-      status: "Success",
-      failureReason: null,
+      content: "User nick@example.com logged in from 192.168.1.140 (Zurich, Switzerland)",
+      important: false,
     },
     {
-      line: 15,
+      id: 15,
       timestamp: "2025-04-14T08:17:00Z",
-      userPrincipalName: "olivia@example.com",
-      ipAddress: "192.168.1.150",
-      location: "Stockholm, Sweden",
-      appDisplayName: "Teams",
-      clientAppUsed: "Browser",
-      status: "Failure",
-      failureReason: "Account locked",
+      content: "Failed login attempt for olivia@example.com from 192.168.1.150 (Stockholm, Sweden) - Account locked",
+      important: true,
     },
     {
-      line: 16,
+      id: 16,
       timestamp: "2025-04-14T08:18:10Z",
-      userPrincipalName: "peter@example.com",
-      ipAddress: "192.168.1.160",
-      location: "Brussels, Belgium",
-      appDisplayName: "OneDrive",
-      clientAppUsed: "Mobile App",
-      status: "Success",
-      failureReason: null,
+      content: "User peter@example.com logged in from 192.168.1.160 (Brussels, Belgium)",
+      important: false,
     },
     {
-      line: 17,
+      id: 17,
       timestamp: "2025-04-14T08:19:25Z",
-      userPrincipalName: "quincy@example.com",
-      ipAddress: "192.168.1.170",
-      location: "Moscow, Russia",
-      appDisplayName: "Exchange Online",
-      clientAppUsed: "Desktop Client",
-      status: "Failure",
-      failureReason: "Invalid credentials",
+      content: "Failed login attempt for quincy@example.com from 192.168.1.170 (Moscow, Russia) - Invalid credentials",
+      important: true,
     },
     {
-      line: 18,
+      id: 18,
       timestamp: "2025-04-14T08:20:40Z",
-      userPrincipalName: "rachel@example.com",
-      ipAddress: "192.168.1.180",
-      location: "Paris, France",
-      appDisplayName: "Custom App",
-      clientAppUsed: "API",
-      status: "Success",
-      failureReason: null,
+      content: "User rachel@example.com logged in from 192.168.1.180 (Paris, France)",
+      important: false,
     },
     {
-      line: 19,
+      id: 19,
       timestamp: "2025-04-14T08:21:55Z",
-      userPrincipalName: "sam@example.com",
-      ipAddress: "192.168.1.190",
-      location: "New York, USA",
-      appDisplayName: "Office 365",
-      clientAppUsed: "Browser",
-      status: "Success",
-      failureReason: null,
+      content: "User sam@example.com logged in from 192.168.1.190 (New York, USA)",
+      important: false,
     },
     {
-      line: 20,
+      id: 20,
       timestamp: "2025-04-14T08:23:05Z",
-      userPrincipalName: "tina@example.com",
-      ipAddress: "192.168.1.200",
-      location: "London, UK",
-      appDisplayName: "Azure Portal",
-      clientAppUsed: "Browser",
-      status: "Failure",
-      failureReason: "MFA required",
+      content: "Failed login attempt for tina@example.com from 192.168.1.200 (London, UK) - MFA required",
+      important: true,
     },
     {
-      line: 21,
+      id: 21,
       timestamp: "2025-04-14T08:24:15Z",
-      userPrincipalName: "umar@example.com",
-      ipAddress: "192.168.1.210",
-      location: "Sydney, Australia",
-      appDisplayName: "Exchange Online",
-      clientAppUsed: "Mobile App",
-      status: "Success",
-      failureReason: null,
+      content: "User umar@example.com logged in from 192.168.1.210 (Sydney, Australia)",
+      important: false,
     },
     {
-      line: 22,
+      id: 22,
       timestamp: "2025-04-14T08:25:30Z",
-      userPrincipalName: "vicki@example.com",
-      ipAddress: "192.168.1.220",
-      location: "Berlin, Germany",
-      appDisplayName: "SharePoint",
-      clientAppUsed: "Browser",
-      status: "Success",
-      failureReason: null,
+      content: "User vicki@example.com logged in from 192.168.1.220 (Berlin, Germany)",
+      important: false,
+    },
+    {
+      id: 23,
+      timestamp: "2025-04-14T08:30:10Z",
+      content: "Multiple failed login attempts detected from 192.168.1.170 (Moscow, Russia)",
+      important: true,
+    },
+    {
+      id: 24,
+      timestamp: "2025-04-14T08:32:45Z",
+      content: "IP 192.168.1.170 temporarily blocked due to suspicious activity",
+      important: true,
+    },
+    {
+      id: 25,
+      timestamp: "2025-04-14T08:35:22Z",
+      content: "Security alert: Possible brute force attack detected from 192.168.1.170",
+      important: true,
     },
   ]
 
   // Filter logs based on search term
-  const filteredLogs = logData.filter(
-    (log) => searchTerm === "" || JSON.stringify(log).toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredLogs = logLines.filter(
+    (log) => searchTerm === "" || log.content.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   // Format timestamp
@@ -289,172 +177,47 @@ export default function LogViewerPage() {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
   }
 
-  // Initialize Three.js scene for the logo
-  useEffect(() => {
-    if (!canvasRef.current) return
-
-    // Set up scene
-    const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000)
-    camera.position.z = 5
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas: canvasRef.current,
-      alpha: true,
-      antialias: true,
-    })
-
-    const size = 60
-    renderer.setSize(size, size)
-    renderer.setClearColor(0x000000, 0)
-
-    // Scale factors based on size
-    const scale = size / 60
-    const axisLength = 1.8 * scale
-    const axisWidth = 0.08 * scale
-    const sphereSize = 0.25 * scale
-
-    // X axis (white)
-    const xGeometry = new THREE.BoxGeometry(axisLength, axisWidth, axisWidth)
-    const xMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
-    const xAxis = new THREE.Mesh(xGeometry, xMaterial)
-    xAxis.position.x = axisLength / 2
-    scene.add(xAxis)
-
-    // Y axis (white)
-    const yGeometry = new THREE.BoxGeometry(axisWidth, axisLength, axisWidth)
-    const yMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
-    const yAxis = new THREE.Mesh(yGeometry, yMaterial)
-    yAxis.position.y = axisLength / 2
-    scene.add(yAxis)
-
-    // Z axis (white)
-    const zGeometry = new THREE.BoxGeometry(axisWidth, axisWidth, axisLength)
-    const zMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
-    const zAxis = new THREE.Mesh(zGeometry, zMaterial)
-    zAxis.position.z = axisLength / 2
-    scene.add(zAxis)
-
-    // Add sphere at intersection
-    const sphereGeometry = new THREE.SphereGeometry(sphereSize, 24, 24)
-    const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
-    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial)
-    scene.add(sphere)
-
-    // Set initial position and rotation
-    scene.rotation.x = Math.PI / 6
-    scene.rotation.y = Math.PI / 4
-
-    // Animation
-    function animate() {
-      animationRef.current = requestAnimationFrame(animate)
-      scene.rotation.y += 0.03
-      renderer.render(scene, camera)
-    }
-
-    animate()
-
-    // Cleanup
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
-
-      // Dispose of Three.js resources
-      scene.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
-          object.geometry.dispose()
-          if (object.material instanceof THREE.Material) {
-            object.material.dispose()
-          } else if (Array.isArray(object.material)) {
-            object.material.forEach((material) => material.dispose())
-          }
-        }
-      })
-
-      renderer.dispose()
-    }
-  }, [])
-
-  // Handle question submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!question.trim()) return
-
-    setIsLoading(true)
-
-    // Simulate AI processing
-    setTimeout(() => {
-      // Generate a response based on the question
-      let aiResponse = ""
-
-      if (question.toLowerCase().includes("failure")) {
-        aiResponse =
-          "I found 5 login failures in the logs. The main reasons were: 'Invalid credentials' (2), 'Password expired' (1), 'MFA required' (1), and 'Account locked' (1)."
-      } else if (question.toLowerCase().includes("location") || question.toLowerCase().includes("country")) {
-        aiResponse =
-          "The logs show logins from multiple countries including USA, UK, Australia, Germany, Japan, France, Canada, Ireland, Spain, Netherlands, Italy, Austria, Switzerland, Sweden, Belgium, and Russia."
-      } else if (question.toLowerCase().includes("app") || question.toLowerCase().includes("application")) {
-        aiResponse =
-          "The most commonly used applications were: Office 365 (5 logins), Azure Portal (4 logins), SharePoint (3 logins), and Exchange Online (3 logins)."
-      } else {
-        aiResponse =
-          "The logs show 22 login attempts with 5 failures and 17 successes. Users accessed various applications from multiple locations around the world. The most active time period was between 08:00 and 08:25 UTC on April 14, 2025."
-      }
-
-      setResponse(aiResponse)
-      setIsLoading(false)
-    }, 1500)
+  // Format date for display
+  const formatDate = (timestamp: string) => {
+    const date = new Date(timestamp)
+    return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
   }
 
-  // Navigate to upload page
-  const handleUploadNew = () => {
-    router.push("/upload")
+  // Toggle section expansion
+  const toggleSection = (section: string) => {
+    if (expandedSection === section) {
+      setExpandedSection(null)
+    } else {
+      setExpandedSection(section)
+    }
   }
 
   return (
+  
+
     <div className="min-h-screen bg-black text-white">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center group">
-            <div className="mr-3 relative w-[60px] h-[60px]">
-              <canvas ref={canvasRef} className="w-full h-full" />
-            </div>
-            <h1 className="text-2xl font-light tracking-wider">
-              <span className="font-semibold">Vertex</span>
-            </h1>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <Link
-              href="/results"
-              className="px-4 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors flex items-center shadow-lg shadow-white/5"
-            >
-              <BarChart2 className="h-4 w-4 mr-2" />
-              View Analysis
-            </Link>
-            <button
-              onClick={handleUploadNew}
-              className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 transition-colors flex items-center shadow-lg shadow-white/5"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload New Log
-            </button>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex items-center gap-3">
+          <Logo />
+          <h1 className="text-2xl font-light tracking-wider">
+            <span className="font-semibold">Vertex</span>
+          </h1>
         </div>
-
+      </div>
+      
+      
+      <div className="max-w-7xl mx-auto px-4 pb-16">
         {/* Main Content - Responsive Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          {/* Log Viewer (Left Side) */}
-          <div className="md:col-span-7 lg:col-span-8 flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mt-4">
+          {/* Log Display (Left Side) */}
+          <div className="md:col-span-6 lg:col-span-7 flex flex-col">
             <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl overflow-hidden border border-zinc-800/50 shadow-xl shadow-purple-900/5 flex flex-col h-[calc(100vh-140px)]">
               {/* Log Header with Search */}
               <div className="p-4 border-b border-zinc-800/50 bg-zinc-900/90">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                   <div className="flex items-center">
                     <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                    <h2 className="text-lg font-medium text-white">{selectedLog}</h2>
+                    <h2 className="text-lg font-medium text-white">auth_logs_2025-04-14.json</h2>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <div className="relative flex-grow">
@@ -467,136 +230,37 @@ export default function LogViewerPage() {
                         className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-lg py-2 pl-10 pr-4 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-purple-500/30 text-sm"
                       />
                     </div>
-                    <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      className={`p-2 rounded-lg ${showFilters ? "bg-purple-500/20 text-purple-300" : "bg-zinc-800/70 text-zinc-400"} hover:bg-zinc-700/50 transition-colors`}
-                    >
-                      <Filter className="h-4 w-4" />
+                    <button className="p-2 rounded-lg bg-zinc-800/70 text-zinc-400 hover:bg-zinc-700/50 transition-colors">
+                      <Download className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
-
-                {/* Filters Panel */}
-                <AnimatePresence>
-                  {showFilters && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="mt-3 pt-3 border-t border-zinc-800/50 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="text-xs text-zinc-500 block mb-1">Status</label>
-                          <select className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-lg py-1.5 px-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/30">
-                            <option value="all">All Statuses</option>
-                            <option value="success">Success</option>
-                            <option value="failure">Failure</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs text-zinc-500 block mb-1">Application</label>
-                          <select className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-lg py-1.5 px-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/30">
-                            <option value="all">All Applications</option>
-                            <option value="office">Office 365</option>
-                            <option value="azure">Azure Portal</option>
-                            <option value="teams">Teams</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs text-zinc-500 block mb-1">Time Range</label>
-                          <div className="flex items-center gap-2">
-                            <button className="flex-grow py-1.5 px-3 bg-zinc-800/70 border border-zinc-700/50 rounded-lg text-white text-sm hover:bg-zinc-700/50 transition-colors flex items-center justify-center">
-                              <Clock className="h-3 w-3 mr-1.5" />
-                              Last Hour
-                            </button>
-                            <button className="flex-grow py-1.5 px-3 bg-zinc-800/70 border border-zinc-700/50 rounded-lg text-white text-sm hover:bg-zinc-700/50 transition-colors flex items-center justify-center">
-                              <Clock className="h-3 w-3 mr-1.5" />
-                              Last Day
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
 
+              {/* Log Content */}
               <div className="flex-grow overflow-auto p-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
-                <div className="space-y-1">
+                <div className="font-mono text-sm">
                   {filteredLogs.map((log) => (
-                    <motion.div
-                      key={log.line}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2 }}
-                      className={`rounded-lg overflow-hidden transition-colors ${expandedLog === log.line ? "bg-zinc-800/70" : "hover:bg-zinc-800/40"}`}
+                    <div
+                      key={log.id}
+                      className={`px-3 py-1.5 border-l-2 ${
+                        log.important
+                          ? "border-green-500 bg-green-500/10 hover:bg-green-500/15"
+                          : "border-transparent hover:bg-zinc-800/40"
+                      } transition-colors`}
                     >
-                      <div
-                        className="px-3 py-2 cursor-pointer flex items-center justify-between"
-                        onClick={() => setExpandedLog(expandedLog === log.line ? null : log.line)}
-                      >
-                        <div className="flex items-center space-x-3 overflow-hidden">
-                          <div
-                            className={`w-2 h-2 rounded-full flex-shrink-0 ${log.status === "Success" ? "bg-green-500" : "bg-red-500"}`}
-                          ></div>
-                          <div className="text-xs text-zinc-400 w-16 flex-shrink-0">
-                            {formatTimestamp(log.timestamp)}
-                          </div>
-                          <div className="text-sm truncate text-white">{log.userPrincipalName}</div>
-                          <div className="text-xs text-zinc-500 truncate hidden sm:block">{log.appDisplayName}</div>
-                        </div>
-                        <div className="flex items-center">
-                          <div className="text-xs bg-zinc-800 px-2 py-0.5 rounded text-zinc-400 mr-2 hidden sm:block">
-                            {log.location.split(",")[0]}
-                          </div>
-                          {expandedLog === log.line ? (
-                            <ChevronUp className="h-4 w-4 text-zinc-500" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-zinc-500" />
-                          )}
-                        </div>
-                      </div>
-
-                      <AnimatePresence>
-                        {expandedLog === log.line && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="px-3 py-3 border-t border-zinc-800/50 text-sm">
-                              <div className="bg-zinc-900/80 rounded-lg p-3 font-mono text-xs text-zinc-300 overflow-x-auto">
-                                {JSON.stringify(log, null, 2)}
-                              </div>
-                              <div className="mt-3 flex justify-between items-center">
-                                <div className="text-xs text-zinc-500">
-                                  Log ID: <span className="font-mono">{log.line.toString().padStart(6, "0")}</span>
-                                </div>
-                                <div className="flex space-x-2">
-                                  <button className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 transition-colors text-zinc-300">
-                                    Copy
-                                  </button>
-                                  <button className="text-xs px-2 py-1 rounded bg-purple-900/30 hover:bg-purple-900/50 transition-colors text-purple-300">
-                                    Analyze
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                      <span className="text-zinc-500 mr-4">{log.id.toString().padStart(3, "0")}</span>
+                      <span className="text-zinc-400 mr-4">{formatTimestamp(log.timestamp)}</span>
+                      <span className={log.important ? "text-green-300" : "text-zinc-300"}>{log.content}</span>
+                    </div>
                   ))}
                 </div>
               </div>
 
+              {/* Log Footer */}
               <div className="p-3 border-t border-zinc-800/50 bg-zinc-900/90 text-xs text-zinc-500 flex justify-between items-center">
                 <div>
-                  Showing {filteredLogs.length} of {logData.length} logs
+                  Showing {filteredLogs.length} of {logLines.length} lines
                 </div>
                 <div className="flex items-center">
                   <span className="mr-2">Last updated: 2 minutes ago</span>
@@ -606,93 +270,271 @@ export default function LogViewerPage() {
             </div>
           </div>
 
-          <div className="md:col-span-5 lg:col-span-4">
+          {/* Narrative (Right Side) */}
+          <div className="md:col-span-6 lg:col-span-5">
             <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl border border-zinc-800/50 shadow-xl shadow-purple-900/5 p-6 h-[calc(100vh-140px)] flex flex-col">
               <div className="mb-6">
                 <h1 className="text-2xl font-bold mb-2 bg-gradient-to-r from-white to-purple-300 bg-clip-text text-transparent">
-                  Vertex AI
+                  Log Narrative
                 </h1>
-                <p className="text-zinc-400">Ask a question about this log file</p>
+                <p className="text-zinc-400">
+                  {formatDate(logLines[0].timestamp)} • {filteredLogs.length} events
+                </p>
               </div>
-
-              <form onSubmit={handleSubmit} className="mb-6">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="e.g., How many login failures are there?"
-                    className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-xl py-3 px-4 pr-12 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-purple-500/30 shadow-inner shadow-black/20"
-                  />
-                  <button
-                    type="submit"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-purple-600 hover:bg-purple-500 transition-colors disabled:opacity-50 disabled:hover:bg-purple-600 shadow-lg shadow-purple-900/30"
-                    disabled={isLoading || !question.trim()}
-                  >
-                    <Send className="h-4 w-4 text-white" />
-                  </button>
-                </div>
-              </form>
 
               <div className="flex-grow overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                {isLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="flex flex-col items-center">
-                      <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                      <div className="text-zinc-400">Analyzing logs...</div>
-                    </div>
-                  </div>
-                ) : response ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-gradient-to-br from-zinc-800/90 to-zinc-900/90 rounded-xl p-4 text-zinc-200 border border-zinc-700/30 shadow-lg"
+                {/* What Happened Section */}
+                <div className="mb-6">
+                  <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => toggleSection("what-happened")}
                   >
-                    <div className="flex items-start mb-3">
-                      <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center mr-3 flex-shrink-0 mt-0.5">
-                        <span className="text-xs font-bold">AI</span>
-                      </div>
-                      <p className="text-sm">{response}</p>
-                    </div>
-                    <div className="flex justify-end">
-                      <button className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 transition-colors text-zinc-300">
-                        Follow up
-                      </button>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center text-zinc-500">
-                    <div className="w-16 h-16 rounded-full bg-zinc-800/70 flex items-center justify-center mb-4">
-                      <ArrowRight className="h-8 w-8 opacity-50" />
-                    </div>
-                    <p className="mb-2">Ask a question about the log data to get insights</p>
-                    <div className="flex flex-wrap justify-center gap-2 mt-4 max-w-xs">
-                      <button
-                        onClick={() => setQuestion("How many login failures are there?")}
-                        className="text-xs px-3 py-1.5 rounded-full bg-zinc-800/70 hover:bg-zinc-700/50 transition-colors text-zinc-300"
-                      >
-                        Login failures?
-                      </button>
-                      <button
-                        onClick={() => setQuestion("Which countries have the most logins?")}
-                        className="text-xs px-3 py-1.5 rounded-full bg-zinc-800/70 hover:bg-zinc-700/50 transition-colors text-zinc-300"
-                      >
-                        Login locations?
-                      </button>
-                      <button
-                        onClick={() => setQuestion("What are the most used applications?")}
-                        className="text-xs px-3 py-1.5 rounded-full bg-zinc-800/70 hover:bg-zinc-700/50 transition-colors text-zinc-300"
-                      >
-                        Popular apps?
-                      </button>
-                    </div>
+                    <h2 className="text-lg font-semibold text-white">What Happened</h2>
+                    {expandedSection === "what-happened" ? (
+                      <ChevronUp className="h-5 w-5 text-zinc-500" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-zinc-500" />
+                    )}
                   </div>
-                )}
+                  {expandedSection === "what-happened" && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="mt-3 text-zinc-300 space-y-3"
+                    >
+                      <p>
+                        A <span className="text-purple-400 font-medium">potential brute force attack</span> was detected
+                        from IP address 192.168.1.170 (Moscow, Russia). The attack consisted of multiple failed login
+                        attempts over a 30-minute period.
+                      </p>
+                      <p>
+                        The system detected 6 failed login attempts, including 2 with invalid credentials, 2 requiring
+                        MFA, 1 with an expired password, and 1 with a locked account. The suspicious IP was temporarily
+                        blocked after multiple failures.
+                      </p>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* When It Happened Section */}
+                <div className="mb-6">
+                  <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => toggleSection("when-happened")}
+                  >
+                    <h2 className="text-lg font-semibold text-white">When It Happened</h2>
+                    {expandedSection === "when-happened" ? (
+                      <ChevronUp className="h-5 w-5 text-zinc-500" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-zinc-500" />
+                    )}
+                  </div>
+                  {expandedSection === "when-happened" && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="mt-3"
+                    >
+                      <div className="text-zinc-300 mb-3">
+                        <p>
+                          The incident occurred on <span className="text-white font-medium">April 14, 2025</span>,
+                          between 08:02 AM and 08:35 AM UTC.
+                        </p>
+                      </div>
+
+                      {/* Timeline */}
+                      <div className="mt-4">
+                        <div
+                          className="flex items-center justify-between cursor-pointer mb-2"
+                          onClick={() => setShowTimeline(!showTimeline)}
+                        >
+                          <h3 className="text-sm font-medium text-zinc-400">Timeline</h3>
+                          {showTimeline ? (
+                            <ChevronUp className="h-4 w-4 text-zinc-500" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-zinc-500" />
+                          )}
+                        </div>
+
+                        {showTimeline && (
+                          <div className="pl-2 border-l border-zinc-700 space-y-3">
+                            <div className="relative">
+                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-purple-500"></div>
+                              <div className="pl-4">
+                                <p className="text-zinc-400 text-xs">08:02 AM</p>
+                                <p className="text-zinc-300 text-sm">
+                                  First failed login attempt (charlie@example.com)
+                                </p>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-zinc-600"></div>
+                              <div className="pl-4">
+                                <p className="text-zinc-400 text-xs">08:07 AM</p>
+                                <p className="text-zinc-300 text-sm">Failed login with expired password</p>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-zinc-600"></div>
+                              <div className="pl-4">
+                                <p className="text-zinc-400 text-xs">08:12 AM</p>
+                                <p className="text-zinc-300 text-sm">Failed login requiring MFA</p>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-zinc-600"></div>
+                              <div className="pl-4">
+                                <p className="text-zinc-400 text-xs">08:17 AM</p>
+                                <p className="text-zinc-300 text-sm">Failed login with locked account</p>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-zinc-600"></div>
+                              <div className="pl-4">
+                                <p className="text-zinc-400 text-xs">08:19 AM</p>
+                                <p className="text-zinc-300 text-sm">
+                                  Failed login from Moscow IP (invalid credentials)
+                                </p>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-purple-500"></div>
+                              <div className="pl-4">
+                                <p className="text-zinc-400 text-xs">08:30 AM</p>
+                                <p className="text-zinc-300 text-sm">Multiple failed logins detected from Moscow IP</p>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-purple-500"></div>
+                              <div className="pl-4">
+                                <p className="text-zinc-400 text-xs">08:32 AM</p>
+                                <p className="text-zinc-300 text-sm">IP 192.168.1.170 temporarily blocked</p>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-red-500"></div>
+                              <div className="pl-4">
+                                <p className="text-zinc-400 text-xs">08:35 AM</p>
+                                <p className="text-zinc-300 text-sm">Security alert: Possible brute force attack</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Why You Should Care Section */}
+                <div className="mb-6">
+                  <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => toggleSection("why-care")}
+                  >
+                    <h2 className="text-lg font-semibold text-white">Why You Should Care</h2>
+                    {expandedSection === "why-care" ? (
+                      <ChevronUp className="h-5 w-5 text-zinc-500" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-zinc-500" />
+                    )}
+                  </div>
+                  {expandedSection === "why-care" && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="mt-3 text-zinc-300 space-y-3"
+                    >
+                      <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4">
+                        <h3 className="text-red-400 font-medium mb-2 flex items-center">
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          High Security Risk
+                        </h3>
+                        <p className="text-zinc-300">
+                          Brute force attacks are systematic attempts to gain unauthorized access by trying multiple
+                          password combinations. This incident suggests a targeted attempt to breach your system.
+                        </p>
+                      </div>
+
+                      <p>
+                        While the system automatically blocked the suspicious IP, this could be part of a larger attack
+                        campaign. The attacker attempted to access multiple user accounts, suggesting they may have a
+                        list of valid email addresses from your organization.
+                      </p>
+
+                      <div className="bg-zinc-800/70 rounded-lg p-4 space-y-2">
+                        <h3 className="text-white font-medium">Recommended Actions:</h3>
+                        <ul className="list-disc pl-5 space-y-1 text-zinc-300">
+                          <li>Review all successful logins from unusual locations</li>
+                          <li>Enforce multi-factor authentication for all users</li>
+                          <li>Consider implementing IP-based access controls</li>
+                          <li>Check for any data exfiltration from compromised accounts</li>
+                          <li>Update your security incident response plan</li>
+                        </ul>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Related Incidents Section */}
+                <div>
+                  <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => toggleSection("related")}
+                  >
+                    <h2 className="text-lg font-semibold text-white">Related Incidents</h2>
+                    {expandedSection === "related" ? (
+                      <ChevronUp className="h-5 w-5 text-zinc-500" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-zinc-500" />
+                    )}
+                  </div>
+                  {expandedSection === "related" && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="mt-3 space-y-3"
+                    >
+                      <div className="bg-zinc-800/50 rounded-lg p-4 hover:bg-zinc-800/70 transition-colors cursor-pointer">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-white font-medium">Similar attack pattern detected last week</h3>
+                            <p className="text-zinc-400 text-sm mt-1">April 7, 2025 • 12 events</p>
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-zinc-500" />
+                        </div>
+                      </div>
+
+                      <div className="bg-zinc-800/50 rounded-lg p-4 hover:bg-zinc-800/70 transition-colors cursor-pointer">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-white font-medium">Global increase in brute force attempts</h3>
+                            <p className="text-zinc-400 text-sm mt-1">Security Advisory • April 10, 2025</p>
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-zinc-500" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-zinc-800/50 flex items-center text-xs text-zinc-500">
-                <AlertCircle className="h-3 w-3 mr-2" />
-                <span>Vertex AI analyzes logs locally. Your data never leaves your device.</span>
+              {/* Footer */}
+              <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between items-center text-xs text-zinc-500">
+                <div className="flex items-center">
+                  <Clock className="h-3 w-3 mr-2" />
+                  <span>Generated 5 minutes ago</span>
+                </div>
+                <Link href="/results" className="text-purple-400 hover:text-purple-300 transition-colors">
+                  View full analysis
+                </Link>
               </div>
             </div>
           </div>
