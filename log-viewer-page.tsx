@@ -1,170 +1,64 @@
 "use client"
 
 import Logo from '@/Logo';
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Clock, AlertCircle, ChevronDown, ChevronUp, Search, Download, ExternalLink } from "lucide-react"
 import Link from "next/link"
+import { useAnalysisStore } from '@/lib/store'
+import { normalize, humanize, type VertexLog } from '@/lib/normalize';
+import { highlight } from '@/lib/highlight'
 
 export default function LogNarrativePage() {
   const [expandedSection, setExpandedSection] = useState<string | null>("what-happened")
   const [searchTerm, setSearchTerm] = useState("")
   const [showTimeline, setShowTimeline] = useState(true)
+  const [logLines, setLogLines] = useState<any[]>([])
+  const { files } = useAnalysisStore()
+  
 
-  // Sample log data with importance flags
-  const logLines = [
-    {
-      id: 1,
-      timestamp: "2025-04-14T08:00:00Z",
-      content: "System startup completed successfully",
-      important: false,
-    },
-    {
-      id: 2,
-      timestamp: "2025-04-14T08:01:15Z",
-      content: "User bob@example.com logged in from 192.168.1.20 (London, UK)",
-      important: false,
-    },
-    {
-      id: 3,
-      timestamp: "2025-04-14T08:02:34Z",
-      content:
-        "Failed login attempt for charlie@example.com from 192.168.1.30 (Sydney, Australia) - Invalid credentials",
-      important: true,
-    },
-    {
-      id: 4,
-      timestamp: "2025-04-14T08:03:45Z",
-      content: "User dana@example.com logged in from 192.168.1.40 (Berlin, Germany)",
-      important: false,
-    },
-    {
-      id: 5,
-      timestamp: "2025-04-14T08:04:56Z",
-      content: "User erin@example.com logged in from 192.168.1.50 (Tokyo, Japan)",
-      important: false,
-    },
-    {
-      id: 6,
-      timestamp: "2025-04-14T08:06:05Z",
-      content: "User fred@example.com logged in from 192.168.1.60 (Paris, France)",
-      important: false,
-    },
-    {
-      id: 7,
-      timestamp: "2025-04-14T08:07:15Z",
-      content: "Failed login attempt for gina@example.com from 192.168.1.70 (Toronto, Canada) - Password expired",
-      important: true,
-    },
-    {
-      id: 8,
-      timestamp: "2025-04-14T08:08:30Z",
-      content: "User harry@example.com logged in from 192.168.1.80 (Dublin, Ireland)",
-      important: false,
-    },
-    {
-      id: 9,
-      timestamp: "2025-04-14T08:09:45Z",
-      content: "User irene@example.com logged in from 192.168.1.90 (Madrid, Spain)",
-      important: false,
-    },
-    {
-      id: 10,
-      timestamp: "2025-04-14T08:10:55Z",
-      content: "User jack@example.com logged in from 192.168.1.100 (San Francisco, USA)",
-      important: false,
-    },
-    {
-      id: 11,
-      timestamp: "2025-04-14T08:12:05Z",
-      content: "Failed login attempt for kate@example.com from 192.168.1.110 (Amsterdam, Netherlands) - MFA required",
-      important: true,
-    },
-    {
-      id: 12,
-      timestamp: "2025-04-14T08:13:20Z",
-      content: "User leo@example.com logged in from 192.168.1.120 (Rome, Italy)",
-      important: false,
-    },
-    {
-      id: 13,
-      timestamp: "2025-04-14T08:14:35Z",
-      content: "User mia@example.com logged in from 192.168.1.130 (Vienna, Austria)",
-      important: false,
-    },
-    {
-      id: 14,
-      timestamp: "2025-04-14T08:15:50Z",
-      content: "User nick@example.com logged in from 192.168.1.140 (Zurich, Switzerland)",
-      important: false,
-    },
-    {
-      id: 15,
-      timestamp: "2025-04-14T08:17:00Z",
-      content: "Failed login attempt for olivia@example.com from 192.168.1.150 (Stockholm, Sweden) - Account locked",
-      important: true,
-    },
-    {
-      id: 16,
-      timestamp: "2025-04-14T08:18:10Z",
-      content: "User peter@example.com logged in from 192.168.1.160 (Brussels, Belgium)",
-      important: false,
-    },
-    {
-      id: 17,
-      timestamp: "2025-04-14T08:19:25Z",
-      content: "Failed login attempt for quincy@example.com from 192.168.1.170 (Moscow, Russia) - Invalid credentials",
-      important: true,
-    },
-    {
-      id: 18,
-      timestamp: "2025-04-14T08:20:40Z",
-      content: "User rachel@example.com logged in from 192.168.1.180 (Paris, France)",
-      important: false,
-    },
-    {
-      id: 19,
-      timestamp: "2025-04-14T08:21:55Z",
-      content: "User sam@example.com logged in from 192.168.1.190 (New York, USA)",
-      important: false,
-    },
-    {
-      id: 20,
-      timestamp: "2025-04-14T08:23:05Z",
-      content: "Failed login attempt for tina@example.com from 192.168.1.200 (London, UK) - MFA required",
-      important: true,
-    },
-    {
-      id: 21,
-      timestamp: "2025-04-14T08:24:15Z",
-      content: "User umar@example.com logged in from 192.168.1.210 (Sydney, Australia)",
-      important: false,
-    },
-    {
-      id: 22,
-      timestamp: "2025-04-14T08:25:30Z",
-      content: "User vicki@example.com logged in from 192.168.1.220 (Berlin, Germany)",
-      important: false,
-    },
-    {
-      id: 23,
-      timestamp: "2025-04-14T08:30:10Z",
-      content: "Multiple failed login attempts detected from 192.168.1.170 (Moscow, Russia)",
-      important: true,
-    },
-    {
-      id: 24,
-      timestamp: "2025-04-14T08:32:45Z",
-      content: "IP 192.168.1.170 temporarily blocked due to suspicious activity",
-      important: true,
-    },
-    {
-      id: 25,
-      timestamp: "2025-04-14T08:35:22Z",
-      content: "Security alert: Possible brute force attack detected from 192.168.1.170",
-      important: true,
-    },
-  ]
+  
+  // Load and process log file
+  useEffect(() => {
+    const loadLogFile = async () => {
+      if (!files || files.length === 0) return
+      
+      try {
+        // Read the file content
+        const file = files[0] as File
+        const fileContent = await file.text()
+        
+        // Parse the JSON
+        const parsedData = JSON.parse(fileContent)
+        const records = Array.isArray(parsedData) ? parsedData : [parsedData]
+        
+        // Use normalize utility to convert to standard format
+        const normalizedLogs = normalize(records)
+        
+        // Use highlight utility to identify important logs
+        const criticalIndices = highlight(normalizedLogs)
+        
+        // Convert to the format expected by the UI
+        const formattedLogs = normalizedLogs.map((log, index) => ({
+          id: index + 1,
+          timestamp: log.timestamp,
+          content: `${log.user} from ${log.ip} - ${log.event}${log.detail ? ': ' + log.detail : ''}`,
+          important: criticalIndices.includes(index)
+        }))
+
+        console.log("Raw JSON:", parsedData)
+        console.log("Normalized:", normalize(records))
+
+        
+        setLogLines(formattedLogs)
+      } catch (error) {
+        console.error('Error loading log file:', error)
+        // Keep existing logs if there's an error
+      }
+    }
+
+    loadLogFile()
+  }, [files])
 
   // Filter logs based on search term
   const filteredLogs = logLines.filter(
@@ -192,9 +86,10 @@ export default function LogNarrativePage() {
     }
   }
 
-  return (
-  
+  // Get the first log date for the header
+  const firstLogDate = logLines.length > 0 ? logLines[0].timestamp : new Date().toISOString()
 
+  return (
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center gap-3">
@@ -217,7 +112,9 @@ export default function LogNarrativePage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                   <div className="flex items-center">
                     <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                    <h2 className="text-lg font-medium text-white">auth_logs_2025-04-14.json</h2>
+                    <h2 className="text-lg font-medium text-white">
+                      {files && files.length > 0 ? files[0].name : "No file selected"}
+                    </h2>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <div className="relative flex-grow">
@@ -278,7 +175,7 @@ export default function LogNarrativePage() {
                   Log Narrative
                 </h1>
                 <p className="text-zinc-400">
-                  {formatDate(logLines[0].timestamp)} • {filteredLogs.length} events
+                  {formatDate(firstLogDate)} • {filteredLogs.length} events
                 </p>
               </div>
 
@@ -305,15 +202,19 @@ export default function LogNarrativePage() {
                       className="mt-3 text-zinc-300 space-y-3"
                     >
                       <p>
-                        A <span className="text-purple-400 font-medium">potential brute force attack</span> was detected
-                        from IP address 192.168.1.170 (Moscow, Russia). The attack consisted of multiple failed login
-                        attempts over a 30-minute period.
+                        {logLines.filter(log => log.important).length > 0 ? (
+                          <>A <span className="text-purple-400 font-medium">security event</span> was detected in your logs. 
+                          There are {logLines.filter(log => log.important).length} important events that require attention.</>
+                        ) : (
+                          <>No critical security events were detected in the analyzed logs.</>
+                        )}
                       </p>
-                      <p>
-                        The system detected 6 failed login attempts, including 2 with invalid credentials, 2 requiring
-                        MFA, 1 with an expired password, and 1 with a locked account. The suspicious IP was temporarily
-                        blocked after multiple failures.
-                      </p>
+                      {logLines.filter(log => log.important).length > 0 && (
+                        <p>
+                          The logs show potential security concerns that should be reviewed by your security team.
+                          These include failed login attempts and potential access violations.
+                        </p>
+                      )}
                     </motion.div>
                   )}
                 </div>
@@ -341,8 +242,7 @@ export default function LogNarrativePage() {
                     >
                       <div className="text-zinc-300 mb-3">
                         <p>
-                          The incident occurred on <span className="text-white font-medium">April 14, 2025</span>,
-                          between 08:02 AM and 08:35 AM UTC.
+                          The analyzed logs are from <span className="text-white font-medium">{formatDate(firstLogDate)}</span>.
                         </p>
                       </div>
 
@@ -362,66 +262,20 @@ export default function LogNarrativePage() {
 
                         {showTimeline && (
                           <div className="pl-2 border-l border-zinc-700 space-y-3">
-                            <div className="relative">
-                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-purple-500"></div>
-                              <div className="pl-4">
-                                <p className="text-zinc-400 text-xs">08:02 AM</p>
-                                <p className="text-zinc-300 text-sm">
-                                  First failed login attempt (charlie@example.com)
-                                </p>
+                            {logLines.filter(log => log.important).slice(0, 8).map((log, idx) => (
+                              <div key={idx} className="relative">
+                                <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-purple-500"></div>
+                                <div className="pl-4">
+                                  <p className="text-zinc-400 text-xs">{formatTimestamp(log.timestamp)}</p>
+                                  <p className="text-zinc-300 text-sm">{humanize(log)}</p>
+                                </div>
                               </div>
-                            </div>
-                            <div className="relative">
-                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-zinc-600"></div>
+                            ))}
+                            {logLines.filter(log => log.important).length === 0 && (
                               <div className="pl-4">
-                                <p className="text-zinc-400 text-xs">08:07 AM</p>
-                                <p className="text-zinc-300 text-sm">Failed login with expired password</p>
+                                <p className="text-zinc-400 text-sm">No critical events found in timeline</p>
                               </div>
-                            </div>
-                            <div className="relative">
-                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-zinc-600"></div>
-                              <div className="pl-4">
-                                <p className="text-zinc-400 text-xs">08:12 AM</p>
-                                <p className="text-zinc-300 text-sm">Failed login requiring MFA</p>
-                              </div>
-                            </div>
-                            <div className="relative">
-                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-zinc-600"></div>
-                              <div className="pl-4">
-                                <p className="text-zinc-400 text-xs">08:17 AM</p>
-                                <p className="text-zinc-300 text-sm">Failed login with locked account</p>
-                              </div>
-                            </div>
-                            <div className="relative">
-                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-zinc-600"></div>
-                              <div className="pl-4">
-                                <p className="text-zinc-400 text-xs">08:19 AM</p>
-                                <p className="text-zinc-300 text-sm">
-                                  Failed login from Moscow IP (invalid credentials)
-                                </p>
-                              </div>
-                            </div>
-                            <div className="relative">
-                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-purple-500"></div>
-                              <div className="pl-4">
-                                <p className="text-zinc-400 text-xs">08:30 AM</p>
-                                <p className="text-zinc-300 text-sm">Multiple failed logins detected from Moscow IP</p>
-                              </div>
-                            </div>
-                            <div className="relative">
-                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-purple-500"></div>
-                              <div className="pl-4">
-                                <p className="text-zinc-400 text-xs">08:32 AM</p>
-                                <p className="text-zinc-300 text-sm">IP 192.168.1.170 temporarily blocked</p>
-                              </div>
-                            </div>
-                            <div className="relative">
-                              <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-red-500"></div>
-                              <div className="pl-4">
-                                <p className="text-zinc-400 text-xs">08:35 AM</p>
-                                <p className="text-zinc-300 text-sm">Security alert: Possible brute force attack</p>
-                              </div>
-                            </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -450,33 +304,35 @@ export default function LogNarrativePage() {
                       transition={{ duration: 0.2 }}
                       className="mt-3 text-zinc-300 space-y-3"
                     >
-                      <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4">
-                        <h3 className="text-red-400 font-medium mb-2 flex items-center">
-                          <AlertCircle className="h-4 w-4 mr-2" />
-                          High Security Risk
-                        </h3>
-                        <p className="text-zinc-300">
-                          Brute force attacks are systematic attempts to gain unauthorized access by trying multiple
-                          password combinations. This incident suggests a targeted attempt to breach your system.
+                      {logLines.filter(log => log.important).length > 0 ? (
+                        <>
+                          <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4">
+                            <h3 className="text-red-400 font-medium mb-2 flex items-center">
+                              <AlertCircle className="h-4 w-4 mr-2" />
+                              Security Risk Detected
+                            </h3>
+                            <p className="text-zinc-300">
+                              The log analysis shows potential security concerns that require attention. 
+                              These patterns may indicate unauthorized access attempts to your systems.
+                            </p>
+                          </div>
+
+                          <div className="bg-zinc-800/70 rounded-lg p-4 space-y-2">
+                            <h3 className="text-white font-medium">Recommended Actions:</h3>
+                            <ul className="list-disc pl-5 space-y-1 text-zinc-300">
+                              <li>Review all successful logins from unusual locations</li>
+                              <li>Enforce multi-factor authentication for all users</li>
+                              <li>Consider implementing IP-based access controls</li>
+                              <li>Check for any data exfiltration from compromised accounts</li>
+                              <li>Update your security incident response plan</li>
+                            </ul>
+                          </div>
+                        </>
+                      ) : (
+                        <p>
+                          No critical security events were detected in the logs. Continue monitoring for any unusual activities.
                         </p>
-                      </div>
-
-                      <p>
-                        While the system automatically blocked the suspicious IP, this could be part of a larger attack
-                        campaign. The attacker attempted to access multiple user accounts, suggesting they may have a
-                        list of valid email addresses from your organization.
-                      </p>
-
-                      <div className="bg-zinc-800/70 rounded-lg p-4 space-y-2">
-                        <h3 className="text-white font-medium">Recommended Actions:</h3>
-                        <ul className="list-disc pl-5 space-y-1 text-zinc-300">
-                          <li>Review all successful logins from unusual locations</li>
-                          <li>Enforce multi-factor authentication for all users</li>
-                          <li>Consider implementing IP-based access controls</li>
-                          <li>Check for any data exfiltration from compromised accounts</li>
-                          <li>Update your security incident response plan</li>
-                        </ul>
-                      </div>
+                      )}
                     </motion.div>
                   )}
                 </div>
@@ -505,8 +361,8 @@ export default function LogNarrativePage() {
                       <div className="bg-zinc-800/50 rounded-lg p-4 hover:bg-zinc-800/70 transition-colors cursor-pointer">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="text-white font-medium">Similar attack pattern detected last week</h3>
-                            <p className="text-zinc-400 text-sm mt-1">April 7, 2025 • 12 events</p>
+                            <h3 className="text-white font-medium">Similar patterns in previous logs</h3>
+                            <p className="text-zinc-400 text-sm mt-1">Last week • View analysis</p>
                           </div>
                           <ExternalLink className="h-4 w-4 text-zinc-500" />
                         </div>
@@ -515,8 +371,8 @@ export default function LogNarrativePage() {
                       <div className="bg-zinc-800/50 rounded-lg p-4 hover:bg-zinc-800/70 transition-colors cursor-pointer">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="text-white font-medium">Global increase in brute force attempts</h3>
-                            <p className="text-zinc-400 text-sm mt-1">Security Advisory • April 10, 2025</p>
+                            <h3 className="text-white font-medium">Security best practices</h3>
+                            <p className="text-zinc-400 text-sm mt-1">Documentation • Updated recently</p>
                           </div>
                           <ExternalLink className="h-4 w-4 text-zinc-500" />
                         </div>
@@ -530,10 +386,10 @@ export default function LogNarrativePage() {
               <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between items-center text-xs text-zinc-500">
                 <div className="flex items-center">
                   <Clock className="h-3 w-3 mr-2" />
-                  <span>Generated 5 minutes ago</span>
+                  <span>Generated just now</span>
                 </div>
-                <Link href="/results" className="text-purple-400 hover:text-purple-300 transition-colors">
-                  View full analysis
+                <Link href="/" className="text-purple-400 hover:text-purple-300 transition-colors">
+                  Return to dashboard
                 </Link>
               </div>
             </div>

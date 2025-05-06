@@ -79,15 +79,9 @@ export default function VertexUI() {
     if (files.length > 0) {
       setIsLoading(true)
 
-      // Prepare file info for the store
-      const fileInfos = files.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      }))
-
+  
       // Store files in global state
-      setStoreFiles(fileInfos)
+      setStoreFiles(files)
 
       // Start analysis
       startAnalysis()

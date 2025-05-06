@@ -1,18 +1,12 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-type FileInfo = {
-  name: string
-  size: number
-  type: string
-}
-
 interface AnalysisState {
-  files: FileInfo[]
+  files: File[]
   isAnalyzing: boolean
   progress: number
   currentStatus: string
-  setFiles: (files: FileInfo[]) => void
+  setFiles: (files: File[]) => void
   startAnalysis: () => void
   updateProgress: (progress: number) => void
   updateStatus: (status: string) => void
@@ -27,7 +21,7 @@ export const useAnalysisStore = create<AnalysisState>()(
       progress: 0,
       currentStatus: "Initializing analysis",
 
-      setFiles: (files) => set({ files }),
+      setFiles: (files: File[]) => set({ files }),
 
       startAnalysis: () =>
         set({
@@ -49,6 +43,11 @@ export const useAnalysisStore = create<AnalysisState>()(
     }),
     {
       name: "vertex-analysis-storage",
+      partialize: (state) => ({
+        isAnalyzing: state.isAnalyzing,
+        progress: state.progress,
+        currentStatus: state.currentStatus,
+      }),
     },
   ),
 )
