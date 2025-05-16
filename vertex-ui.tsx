@@ -111,11 +111,9 @@ export default function VertexUI() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-4xl md:text-5xl font-bold text-center mb-10 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400"
+            className="text-4xl md:text-5xl font-bold text-center mb-10 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 py-1"
           >
-            Analyze Security Logs Locally
-
-
+            Move From Detection to Response in Minutes, Not Hours
           </motion.h2>
 
           <motion.p
@@ -124,8 +122,7 @@ export default function VertexUI() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-gray-400 text-center mb-12 max-w-2xl text-lg"
           >
-            Powerful AI-driven log analysis that runs entirely on your machine. No data leaves your system. Get instant
-            insights without compromising security.
+            Vertex is your security reasoning layer - instantly explaining what happened, when, and why across all your security tools so you can take action before damage spreads
           </motion.p>
 
           {/* Drag & Drop Area */}
