@@ -100,9 +100,6 @@ export default function VertexUI() {
         {/* Header */}
         <div className="flex items-center mb-10 mt-4">
           <Logo />
-          <h1 className="text-2xl font-light tracking-wider">
-            <span className="font-semibold">Vertex</span>
-          </h1>
         </div>
 
         {/* Main Content */}

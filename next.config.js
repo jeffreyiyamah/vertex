@@ -5,5 +5,6 @@ module.exports = {
   webpack: (config) => {
     config.resolve.alias["@tailwindcss/postcss"] = require.resolve("tailwindcss");
     return config;
+    
   },
 };
