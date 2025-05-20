@@ -20,6 +20,7 @@ export default function LogNarrativePage() {
   
   // Load and process log file
   useEffect(() => {
+    // Update the loadLogFile function in log-viewer-page.tsx
     const loadLogFile = async () => {
       if (!files || files.length === 0) return
       
@@ -30,10 +31,18 @@ export default function LogNarrativePage() {
         
         // Parse the JSON
         const parsedData = JSON.parse(fileContent)
-        const records = Array.isArray(parsedData) ? parsedData : [parsedData]
+        
+        // Handle the CloudTrail format which has a "Records" property containing the array of log entries
+        const records = parsedData.Records || parsedData
+        
+        // Make sure we're dealing with an array
+        const recordsArray = Array.isArray(records) ? records : [records]
+        
+        console.log("Raw data format:", parsedData)
+        console.log("Records to process:", recordsArray.length)
         
         // Use normalize utility to convert to standard format
-        const normalizedLogs = normalize(records)
+        const normalizedLogs = normalize(recordsArray)
         
         // Use highlight utility to identify important logs
         const criticalIndices = highlight(normalizedLogs)
@@ -42,13 +51,12 @@ export default function LogNarrativePage() {
         const formattedLogs = normalizedLogs.map((log, index) => ({
           id: index + 1,
           timestamp: log.timestamp,
-          content: `${log.user} from ${log.ip} - ${log.event}${log.detail ? ': ' + log.detail : ''}`,
+          content: `${log.user || 'Unknown user'} from ${log.ip || 'unknown IP'} - ${log.event}${log.detail ? ': ' + log.detail : ''}`,
           important: criticalIndices.includes(index)
         }))
-
-        console.log("Raw JSON:", parsedData)
-        console.log("Normalized:", normalize(records))
-
+        
+        console.log("Normalized logs:", normalizedLogs.length)
+        console.log("First log:", normalizedLogs[0])
         
         setLogLines(formattedLogs)
       } catch (error) {
