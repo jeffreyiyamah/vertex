@@ -44,7 +44,8 @@ export default function LogNarrativePage() {
           id: index + 1,
           timestamp: log.timestamp,
           content: `${log.user || 'root'} from ${log.ip || 'unknown IP'} - ${log.event}${log.detail ? ': ' + log.detail : ''}`,
-          important: criticalIndices.includes(index)
+          important: criticalIndices.includes(index),
+          rawData: recordsArray[index]
         }))
         
         console.log("Normalized logs:", normalizedLogs.length)
