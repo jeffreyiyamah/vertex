@@ -84,9 +84,7 @@ export function capitalize(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 }
 
-/**
- * Turn a VertexLog into a human-friendly sentence.
- */
+
 export function humanize(log: VertexLog): string {
   const user = capitalize(log.user) || 'Unknown user';
   const ip = log.ip || 'unknown IP';

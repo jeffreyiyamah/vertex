@@ -6,6 +6,7 @@ import { motion } from "framer-motion"
 import { Clock, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Search, Download, ExternalLink, X } from "lucide-react"
 import Link from "next/link"
 import { useAnalysisStore } from '@/lib/store'
+import { CausalGraph } from '@/lib/casual-graph'
 import { normalize, humanize, type VertexLog } from '@/lib/normalize';
 import { highlight } from '@/lib/highlight'
 
@@ -16,6 +17,7 @@ export default function LogNarrativePage() {
   const [expandedLogs, setExpandedLogs] = useState<Record<number, boolean>>({})
   const [logLines, setLogLines] = useState<any[]>([])
   const { files } = useAnalysisStore()
+  const [narrative, setNarrative] = useState<string>("Loading analysis...")
   
 
   
@@ -33,12 +35,12 @@ export default function LogNarrativePage() {
         
         const recordsArray = Array.isArray(records) ? records : [records]
         
-        console.log("Raw data format:", parsedData)
-        console.log("Records to process:", recordsArray.length)
-        
         const normalizedLogs = normalize(recordsArray)
-        
+        const graph = new CausalGraph(normalizedLogs)
+        const generatedNarrative = graph.generateNarrative()
+        setNarrative(generatedNarrative)
         const criticalIndices = highlight(normalizedLogs)
+        console.log('Attack chains:', graph.getAttackChains())
         
         const formattedLogs = normalizedLogs.map((log, index) => ({
           id: index + 1,
@@ -48,9 +50,8 @@ export default function LogNarrativePage() {
           rawData: recordsArray[index]
         }))
         
-        console.log("Normalized logs:", normalizedLogs.length)
-        console.log("First log:", normalizedLogs[0])
-        
+        console.log('Narrative:', graph.generateNarrative())
+
         setLogLines(formattedLogs)
       } catch (error) {
         console.error('Error loading log file:', error)
@@ -81,6 +82,25 @@ export default function LogNarrativePage() {
       setExpandedSection(section)
     }
   }
+
+  // Add this function in log-viewer-page.tsx
+const formatNarrative = (narrative: string) => {
+  // Split on "**" to find bold sections
+  const parts = narrative.split('**')
+  
+  return parts.map((part, index) => {
+    if (index % 2 === 1) { // Odd indices are between ** markers
+      if (part.includes('Privilege escalation attack detected')) {
+        return <span key={index} className="text-purple-400 font-bold">{part}</span>
+      }
+      if (part.includes('Risk Level: CRITICAL')) {
+        return <span key={index} className="text-red-400 font-bold">{part}</span>
+      }
+      return <span key={index} className="font-bold text-white">{part}</span>
+    }
+    return <span key={index}>{part}</span>
+  })
+}
 
   const toggleExpand = (id: number) => {
     setExpandedLogs((prev) => ({
@@ -244,20 +264,9 @@ export default function LogNarrativePage() {
                       transition={{ duration: 0.2 }}
                       className="mt-3 text-zinc-300 space-y-3"
                     >
-                      <p>
-                        {logLines.filter(log => log.important).length > 0 ? (
-                          <>A <span className="text-purple-400 font-medium">security event</span> was detected in your logs. 
-                          There are {logLines.filter(log => log.important).length} important events that require attention.</>
-                        ) : (
-                          <>No critical security events were detected in the analyzed logs.</>
-                        )}
-                      </p>
-                      {logLines.filter(log => log.important).length > 0 && (
-                        <p>
-                          The logs show potential security concerns that should be reviewed by your security team.
-                          These include failed login attempts and potential access violations.
-                        </p>
-                      )}
+                      <div className="bg-zinc-800/70 rounded-lg p-4">
+                        {formatNarrative(narrative)}
+                      </div>
                     </motion.div>
                   )}
                 </div>
