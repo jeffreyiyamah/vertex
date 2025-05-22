@@ -130,7 +130,7 @@ private getTimeDifference(nodeA: CausalNode, nodeB: CausalNode): string {
   
   if (diffMinutes < 1) return 'immediately'
   if (diffMinutes === 1) return '1 minute'
-  if (diffMinutes < 60) return `${diffMinutes} minutes`
+  if (diffMinutes < 60) return `${diffMinutes} minute`
   
   const hours = Math.floor(diffMinutes / 60)
   const remainingMinutes = diffMinutes % 60
