@@ -18,6 +18,38 @@ export function normalize(records: any[] | Record<string, any>): VertexLog[] {
   const arr = Array.isArray(records) ? records : [records];
 
   return arr.map((r) => {
+    if (r.eventType === "AwsCloudTrailInsight") {
+      return {
+        timestamp: r.eventTime || '',
+        user: "CloudTrail Insights",
+        ip: "AWS Internal",
+        event: r.insightDetails?.eventName || 'insight_event',
+        detail: `API call rate insight: ${r.insightDetails?.state || 'unknown'} - ${r.insightDetails?.insightType || ''}`
+      };
+    }
+
+    // Handle Network Activity events
+    if (r.eventCategory === "NetworkActivity") {
+      return {
+        timestamp: r.eventTime || '',
+        user: r.userIdentity?.userName || r.userIdentity?.type || 'network_user',
+        ip: r.sourceIPAddress || r.vpcEndpointId || 'vpc_internal',
+        event: 'network_activity',
+        detail: `${r.eventName || 'network_event'} via ${r.vpcEndpointId || 'VPC endpoint'}`
+      };
+    }
+
+    // Handle Data events (S3, Lambda, DynamoDB operations)
+    if (r.eventCategory === "Data") {
+      const resourceType = r.resources?.[0]?.type || 'unknown_resource';
+      return {
+        timestamp: r.eventTime || '',
+        user: r.userIdentity?.userName || r.userIdentity?.type || 'data_user',
+        ip: r.sourceIPAddress || r.userIdentity?.invokedBy || 'aws_service',
+        event: 'data_event',
+        detail: `${r.eventName || 'data_operation'} on ${resourceType.replace('AWS::', '')}`
+      };
+    }
     // Base fields
     const timestamp = r.eventTime ?? r.timestamp ?? '';
     const user = r.userIdentity?.userName ?? r.userName ?? r.username ?? '';
