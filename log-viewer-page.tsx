@@ -3,12 +3,84 @@
 import Logo from '@/Logo';
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Clock, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Search, Download, ExternalLink, X } from "lucide-react"
+import { Clock, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Search, Download, ExternalLink, X, Shield, AlertTriangle, FileText, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { useAnalysisStore } from '@/lib/store'
-import { CausalGraph } from '@/lib/casual-graph'
 import { normalize, humanize, type VertexLog } from '@/lib/normalize';
-import { highlight } from '@/lib/highlight'
+import { highlight, getRiskLevel } from '@/lib/highlight'
+import { summarize } from '@/lib/summarize'
+
+interface WhyCareContent {
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  actions: string[];
+}
+
+function renderMarkdown(text: string) {
+  return text.split(/(\*\*.*?\*\*)/).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+// Human readable timeline descriptions
+function getHumanReadableDescription(log: any): string {
+  const event = log.vertexLog;
+  const user = event.user;
+  const ip = event.ip;
+  
+  switch (event.event) {
+    case 'login_failed':
+      return `Failed login attempt by ${user} from ${isExternalIP(ip) ? 'external' : 'internal'} location`;
+    
+    case 'encryption_key_created':
+      return `${user} created encryption key for sensitive data protection`;
+    
+    case 'instance_created':
+      return `${user} launched new EC2 instance for cloud computing`;
+    
+    case 'bucket_created':
+      return `${user} created S3 storage bucket for data management`;
+    
+    case 'file_uploaded':
+      return `${user} uploaded sensitive file to cloud storage`;
+    
+    case 'log_archived':
+      return `System automatically archived security audit logs`;
+    
+    case 'policy_accessed':
+      return `${user} accessed administrative policy settings`;
+    
+    case 'firewall_rule_added':
+      return `${user} modified network security rules`;
+    
+    case 'compliance_rule_created':
+      return `${user} configured compliance monitoring rule`;
+    
+    case 'notebook_created':
+      return `${user} created data analysis environment`;
+    
+    default:
+      return `${user} performed ${event.event.replace('_', ' ')} operation`;
+  }
+}
+
+function isExternalIP(ip: string): boolean {
+  if (!ip) return false;
+  const privateRanges = [
+    /^10\./,
+    /^172\.(1[6-9]|2[0-9]|3[01])\./,
+    /^192\.168\./,
+    /^127\./,
+  ];
+  return !privateRanges.some(range => range.test(ip));
+}
 
 export default function LogNarrativePage() {
   const [expandedSection, setExpandedSection] = useState<string | null>("what-happened")
@@ -16,10 +88,9 @@ export default function LogNarrativePage() {
   const [showTimeline, setShowTimeline] = useState(true)
   const [expandedLogs, setExpandedLogs] = useState<Record<number, boolean>>({})
   const [logLines, setLogLines] = useState<any[]>([])
+  const [narrative, setNarrative] = useState<string>("")
+  const [riskLevel, setRiskLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('LOW')
   const { files } = useAnalysisStore()
-  const [narrative, setNarrative] = useState<string>("Loading analysis...")
-  
-
   
   useEffect(() => {
     const loadLogFile = async () => {
@@ -30,28 +101,35 @@ export default function LogNarrativePage() {
         const fileContent = await file.text()
         
         const parsedData = JSON.parse(fileContent)
-        
         const records = parsedData.Records || parsedData
-        
         const recordsArray = Array.isArray(records) ? records : [records]
         
+        // Normalize logs with enhanced classification
         const normalizedLogs = normalize(recordsArray)
-        const graph = new CausalGraph(normalizedLogs)
-        const generatedNarrative = graph.generateNarrative()
-        setNarrative(generatedNarrative)
-        const criticalIndices = highlight(normalizedLogs)
-        console.log('Attack chains:', graph.getAttackChains())
         
+        // Get critical event indices
+        const criticalIndices = highlight(normalizedLogs)
+        const criticalLogs = criticalIndices.map(i => normalizedLogs[i])
+        
+        // Generate narrative and risk assessment
+        const generatedNarrative = summarize(criticalLogs)
+        const assessedRiskLevel = getRiskLevel(criticalLogs)
+        
+        setNarrative(generatedNarrative)
+        setRiskLevel(assessedRiskLevel)
+        
+        // Format logs for display
         const formattedLogs = normalizedLogs.map((log, index) => ({
           id: index + 1,
           timestamp: log.timestamp,
-          content: `${log.user || 'root'} from ${log.ip || 'unknown IP'} - ${log.event}${log.detail ? ': ' + log.detail : ''}`,
+          content: humanize(log),
           important: criticalIndices.includes(index),
-          rawData: recordsArray[index]
+          severity: log.severity || 'low',
+          category: log.category || 'administrative',
+          rawData: recordsArray[index],
+          vertexLog: log
         }))
         
-        console.log('Narrative:', graph.generateNarrative())
-
         setLogLines(formattedLogs)
       } catch (error) {
         console.error('Error loading log file:', error)
@@ -76,31 +154,8 @@ export default function LogNarrativePage() {
   }
 
   const toggleSection = (section: string) => {
-    if (expandedSection === section) {
-      setExpandedSection(null)
-    } else {
-      setExpandedSection(section)
-    }
+    setExpandedSection(expandedSection === section ? null : section)
   }
-
-  // Add this function in log-viewer-page.tsx
-const formatNarrative = (narrative: string) => {
-  // Split on "**" to find bold sections
-  const parts = narrative.split('**')
-  
-  return parts.map((part, index) => {
-    if (index % 2 === 1) { // Odd indices are between ** markers
-      if (part.includes('Privilege escalation attack detected')) {
-        return <span key={index} className="text-purple-400 font-bold">{part}</span>
-      }
-      if (part.includes('Risk Level: CRITICAL')) {
-        return <span key={index} className="text-red-400 font-bold">{part}</span>
-      }
-      return <span key={index} className="font-bold text-white">{part}</span>
-    }
-    return <span key={index}>{part}</span>
-  })
-}
 
   const toggleExpand = (id: number) => {
     setExpandedLogs((prev) => ({
@@ -108,10 +163,10 @@ const formatNarrative = (narrative: string) => {
       [id]: !prev[id]
     }));
   }
+
   const formatJsonForDisplay = (obj: any) => {
     if (!obj) return "No raw data available";
     
-    // Select most relevant fields for display
     const relevantFields = {
       eventTime: obj.eventTime,
       eventName: obj.eventName,
@@ -128,7 +183,191 @@ const formatNarrative = (narrative: string) => {
     return JSON.stringify(relevantFields, null, 2);
   };
 
-  // Get the first log date for the header
+  const getRiskLevelColor = (level: string) => {
+    switch(level) {
+      case 'CRITICAL': return 'text-red-400'
+      case 'HIGH': return 'text-red-400'  // Changed from orange to red
+      case 'MEDIUM': return 'text-yellow-400'
+      case 'LOW': return 'text-green-400'
+      default: return 'text-gray-400'
+    }
+  }
+
+  const getSeverityColor = (severity: string) => {
+    switch(severity) {
+      case 'critical': return 'border-red-500 bg-red-500/10'
+      case 'high': return 'border-red-500 bg-red-500/10'  // Changed from orange to red
+      case 'medium': return 'border-yellow-500 bg-yellow-500/10'
+      case 'low': return 'border-green-500 bg-green-500/10'
+      default: return 'border-gray-500 bg-gray-500/10'
+    }
+  }
+
+  const getSeverityTextColor = (severity: string) => {
+    switch(severity) {
+      case 'critical': return 'text-red-300'
+      case 'high': return 'text-red-300'  // Changed from orange to red
+      case 'medium': return 'text-yellow-300'
+      case 'low': return 'text-green-300'
+      default: return 'text-zinc-300'
+    }
+  }
+
+  const getSeverityBgColor = (severity: string) => {
+    switch(severity) {
+      case 'critical': return 'bg-red-500'
+      case 'high': return 'bg-red-500'  // Changed from orange to red
+      case 'medium': return 'bg-yellow-500'
+      case 'low': return 'bg-green-500'
+      default: return 'bg-zinc-500'
+    }
+  }
+
+  function getWhyCareContent(
+    riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+    criticalLogs: any[]
+  ): WhyCareContent {
+    const hasFailedLogins = criticalLogs.some(log => log.vertexLog?.event === 'login_failed');
+    const hasRootActivity = criticalLogs.some(log => log.vertexLog?.user === 'Root' || log.vertexLog?.user === 'root');
+    const hasExternalIPs = criticalLogs.some(log => 
+      log.vertexLog?.ip && !log.vertexLog.ip.startsWith('192.168.') && 
+      !log.vertexLog.ip.startsWith('10.') && !log.vertexLog.ip.startsWith('172.')
+    );
+
+    switch (riskLevel) {
+      case 'CRITICAL':
+        return {
+          color: 'text-red-400',
+          bgColor: 'bg-red-950/30',
+          borderColor: 'border-red-900/50',
+          icon: <AlertTriangle className="h-4 w-4" />,
+          title: 'Critical Security Breach Detected',
+          description: 'Immediate action required! Active security incidents detected with strong indicators of system compromise. Potential data breach or ongoing attack in progress.',
+          actions: [
+            'IMMEDIATELY isolate affected systems',
+            'Activate incident response team',
+            'Preserve forensic evidence',
+            'Reset all potentially compromised credentials',
+            'Contact law enforcement if data breach suspected',
+            'Notify stakeholders and customers as required'
+          ]
+        };
+
+      case 'HIGH':
+        return {
+          color: 'text-red-400',
+          bgColor: 'bg-red-950/30',
+          borderColor: 'border-red-900/50',
+          icon: <Shield className="h-4 w-4" />,
+          title: 'High Risk Security Events',
+          description: hasExternalIPs && hasFailedLogins 
+            ? 'Suspicious authentication patterns detected from external sources. While not definitively compromised, these events require urgent investigation to prevent potential breach.'
+            : 'High-risk security activities detected that could indicate attack preparation or reconnaissance. Prompt investigation recommended.',
+          actions: [
+            'Investigate all flagged events within 2 hours',
+            'Verify legitimacy of all external access attempts',
+            'Enable enhanced monitoring for affected accounts',
+            'Consider temporary access restrictions',
+            'Review recent privilege changes',
+            'Prepare incident response procedures'
+          ]
+        };
+
+      case 'MEDIUM':
+        return {
+          color: 'text-yellow-400',
+          bgColor: 'bg-yellow-950/30',
+          borderColor: 'border-yellow-900/50',
+          icon: <FileText className="h-4 w-4" />,
+          title: 'Security Events Requiring Review',
+          description: hasFailedLogins && hasRootActivity
+            ? 'Failed authentication attempts and administrative activities detected, but analysis shows no correlation between events. While not immediately threatening, these warrant routine security review.'
+            : 'Moderate security events detected. These appear to be isolated incidents but should be reviewed as part of regular security monitoring.',
+          actions: [
+            'Review events during next security check (within 24 hours)',
+            'Verify administrative activities were authorized',
+            'Monitor for repeat failed authentication attempts',
+            'Update security monitoring rules if needed',
+            'Document events for trend analysis',
+            'Consider additional MFA enforcement'
+          ]
+        };
+
+      case 'LOW':
+      default:
+        return {
+          color: 'text-green-400',
+          bgColor: 'bg-green-950/30',
+          borderColor: 'border-green-900/50',
+          icon: <CheckCircle className="h-4 w-4" />,
+          title: 'System Operating Normally',
+          description: 'Security monitoring is active and no significant threats detected. All flagged events appear to be routine operations or isolated minor incidents with no indication of malicious activity.',
+          actions: [
+            'Continue standard security monitoring',
+            'Review logs during regular security audits',
+            'Maintain current security policies',
+            'Consider security awareness training updates',
+            'Document baseline activity patterns',
+            'Schedule next security assessment'
+          ]
+        };
+    }
+  }
+
+  function renderWhyCareSection(riskLevel: string, criticalLogs: any[]) {
+    const content = getWhyCareContent(riskLevel as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', criticalLogs);
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: "auto" }}
+        exit={{ opacity: 0, height: 0 }}
+        transition={{ duration: 0.2 }}
+        className="mt-3 text-zinc-300 space-y-3"
+      >
+        <div className={`${content.bgColor} border ${content.borderColor} rounded-lg p-4`}>
+          <h3 className={`${content.color} font-medium mb-2 flex items-center`}>
+            <span className="mr-2">{content.icon}</span>
+            {content.title}
+          </h3>
+          <p className="text-zinc-300 mb-4">
+            {content.description}
+          </p>
+        </div>
+
+        <div className="bg-zinc-800/70 rounded-lg p-4 space-y-2">
+          <h3 className="text-white font-medium">
+            {riskLevel === 'CRITICAL' ? 'Immediate Actions Required:' : 
+             riskLevel === 'HIGH' ? 'Urgent Actions Recommended:' :
+             riskLevel === 'MEDIUM' ? 'Recommended Actions:' : 
+             'Suggested Actions:'}
+          </h3>
+          <ul className="list-disc pl-5 space-y-1 text-zinc-300">
+            {content.actions.map((action, index) => (
+              <li key={index} className={riskLevel === 'CRITICAL' ? 'font-medium' : ''}>
+                {action}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Additional context for specific scenarios */}
+        {riskLevel === 'MEDIUM' && criticalLogs.some(log => log.vertexLog?.event === 'login_failed') && (
+          <div className="bg-blue-950/30 border border-blue-900/50 rounded-lg p-3">
+            <h4 className="text-blue-400 font-medium mb-1 flex items-center">
+              <AlertCircle className="h-3 w-3 mr-2" />
+              Context
+            </h4>
+            <p className="text-zinc-300 text-sm">
+              The failed login attempt appears to be isolated and unrelated to other system activities. 
+              This could be a legitimate user error, but monitoring for patterns is recommended.
+            </p>
+          </div>
+        )}
+      </motion.div>
+    );
+  }
+
   const firstLogDate = logLines.length > 0 ? logLines[0].timestamp : new Date().toISOString()
 
   return (
@@ -138,7 +377,6 @@ const formatNarrative = (narrative: string) => {
           <Logo />
         </div>
       </div>
-      
       
       <div className="max-w-7xl mx-auto px-4 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mt-4">
@@ -151,6 +389,9 @@ const formatNarrative = (narrative: string) => {
                     <h2 className="text-lg font-medium text-white">
                       {files && files.length > 0 ? files[0].name : "No file selected"}
                     </h2>
+                    <div className={`ml-3 px-2 py-1 rounded-full text-xs font-medium ${getRiskLevelColor(riskLevel)} bg-current/10`}>
+                      {riskLevel} RISK
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <div className="relative flex-grow">
@@ -178,7 +419,7 @@ const formatNarrative = (narrative: string) => {
                     <div
                       className={`group px-3 py-1.5 border-l-2 ${
                         log.important
-                          ? "border-green-500 bg-green-500/10 hover:bg-green-500/15"
+                          ? getSeverityColor(log.severity)
                           : "border-transparent hover:bg-zinc-800/40"
                       } transition-colors flex items-center`}
                     >
@@ -194,7 +435,21 @@ const formatNarrative = (narrative: string) => {
                       </button>
                       <span className="text-zinc-500 mr-4">{log.id.toString().padStart(3, "0")}</span>
                       <span className="text-zinc-400 mr-4">{formatTimestamp(log.timestamp)}</span>
-                      <span className={log.important ? "text-green-300" : "text-zinc-300"}>{log.content}</span>
+                      <div className="flex items-center flex-grow">
+                        <span className={log.important ? getSeverityTextColor(log.severity) : "text-zinc-300"}>
+                          {log.content}
+                        </span>
+                        {log.important && (
+                          <div className="ml-2 flex items-center gap-1">
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getSeverityColor(log.severity)} text-current`}>
+                              {log.severity?.toUpperCase()}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-xs bg-zinc-700 text-zinc-300">
+                              {log.category?.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     {/* Expanded Details View */}
@@ -207,6 +462,16 @@ const formatNarrative = (narrative: string) => {
                         >
                           <X className="h-3 w-3 text-zinc-500" />
                         </button>
+                        <div className="mb-2">
+                          <h4 className="text-sm font-medium text-white mb-1">Event Details</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div><span className="text-zinc-400">Event:</span> <span className="text-white">{log.vertexLog.event}</span></div>
+                            <div><span className="text-zinc-400">Severity:</span> <span className={getSeverityTextColor(log.severity)}>{log.severity}</span></div>
+                            <div><span className="text-zinc-400">Category:</span> <span className="text-zinc-300">{log.category}</span></div>
+                            <div><span className="text-zinc-400">User:</span> <span className="text-white">{log.vertexLog.user}</span></div>
+                          </div>
+                        </div>
+                        <h4 className="text-sm font-medium text-white mb-1">Raw Data</h4>
                         <pre className="text-xs text-zinc-300 whitespace-pre-wrap">
                           {formatJsonForDisplay(log.rawData)}
                         </pre>
@@ -220,7 +485,7 @@ const formatNarrative = (narrative: string) => {
               {/* Log Footer */}
               <div className="p-3 border-t border-zinc-800/50 bg-zinc-900/90 text-xs text-zinc-500 flex justify-between items-center">
                 <div>
-                  Showing {filteredLogs.length} of {logLines.length} lines
+                  Showing {filteredLogs.length} of {logLines.length} lines • {logLines.filter(log => log.important).length} critical events
                 </div>
                 <div className="flex items-center">
                   <span className="mr-2">Last updated: 2 minutes ago</span>
@@ -234,11 +499,16 @@ const formatNarrative = (narrative: string) => {
           <div className="md:col-span-6 lg:col-span-5">
             <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl border border-zinc-800/50 shadow-xl shadow-purple-900/5 p-6 h-[calc(100vh-140px)] flex flex-col">
               <div className="mb-6">
-                <h1 className="text-2xl font-bold mb-2 bg-gradient-to-r from-white to-purple-300 bg-clip-text text-transparent">
-                  Log Narrative
-                </h1>
+                <div className="flex items-center justify-between mb-2">
+                  <h1 className="text-2xl font-bold text-purple-300">
+                    Security Analysis
+                  </h1>
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${getRiskLevelColor(riskLevel)} bg-current/10`}>
+                    {riskLevel} RISK
+                  </div>
+                </div>
                 <p className="text-zinc-400">
-                  {formatDate(firstLogDate)} • {filteredLogs.length} events
+                  {formatDate(firstLogDate)} • {filteredLogs.length} events analyzed
                 </p>
               </div>
 
@@ -264,27 +534,27 @@ const formatNarrative = (narrative: string) => {
                       transition={{ duration: 0.2 }}
                       className="mt-3 text-zinc-300 space-y-3"
                     >
-                      <div className="bg-zinc-800/70 rounded-lg p-4">
-                        {formatNarrative(narrative)}
+                      <div className="whitespace-pre-line">
+                        {renderMarkdown(narrative || "Analysis in progress...")}
                       </div>
                     </motion.div>
                   )}
                 </div>
 
-                {/* When It Happened Section */}
+                {/* Timeline Section */}
                 <div className="mb-6">
                   <div
                     className="flex items-center justify-between cursor-pointer"
-                    onClick={() => toggleSection("when-happened")}
+                    onClick={() => toggleSection("timeline")}
                   >
-                    <h2 className="text-lg font-semibold text-white">When It Happened</h2>
-                    {expandedSection === "when-happened" ? (
+                    <h2 className="text-lg font-semibold text-white">Event Timeline</h2>
+                    {expandedSection === "timeline" ? (
                       <ChevronUp className="h-5 w-5 text-zinc-500" />
                     ) : (
                       <ChevronDown className="h-5 w-5 text-zinc-500" />
                     )}
                   </div>
-                  {expandedSection === "when-happened" && (
+                  {expandedSection === "timeline" && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
@@ -292,42 +562,24 @@ const formatNarrative = (narrative: string) => {
                       transition={{ duration: 0.2 }}
                       className="mt-3"
                     >
-                      <div className="text-zinc-300 mb-3">
-                        <p>
-                          The analyzed logs are from <span className="text-white font-medium">{formatDate(firstLogDate)}</span>.
-                        </p>
-                      </div>
-
-                      {/* Timeline */}
-                      <div className="mt-4">
-                        <div
-                          className="flex items-center justify-between cursor-pointer mb-2"
-                          onClick={() => setShowTimeline(!showTimeline)}
-                        >
-                          <h3 className="text-sm font-medium text-zinc-400">Timeline</h3>
-                          {showTimeline ? (
-                            <ChevronUp className="h-4 w-4 text-zinc-500" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-zinc-500" />
-                          )}
-                        </div>
-
-                        {showTimeline && (
-                          <div className="pl-2 border-l border-zinc-700 space-y-3">
-                            {logLines.filter(log => log.important).slice(0, 8).map((log, idx) => (
-                              <div key={idx} className="relative">
-                                <div className="absolute left-[-9px] top-2 w-4 h-4 rounded-full bg-purple-500"></div>
-                                <div className="pl-4">
-                                  <p className="text-zinc-400 text-xs">{formatTimestamp(log.timestamp)}</p>
-                                  <p className="text-zinc-300 text-sm">{humanize(log)}</p>
-                                </div>
+                      <div className="pl-2 border-l border-zinc-700 space-y-3">
+                        {logLines.filter(log => log.important).slice(0, 10).map((log, idx) => (
+                          <div key={idx} className="relative">
+                            <div className={`absolute left-[-9px] top-2 w-4 h-4 rounded-full ${getSeverityBgColor(log.severity)}`}></div>
+                            <div className="pl-4">
+                              <div className="flex items-center gap-2">
+                                <p className="text-zinc-400 text-xs">{formatTimestamp(log.timestamp)}</p>
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${getSeverityColor(log.severity)}`}>
+                                  {log.severity?.toUpperCase()}
+                                </span>
                               </div>
-                            ))}
-                            {logLines.filter(log => log.important).length === 0 && (
-                              <div className="pl-4">
-                                <p className="text-zinc-400 text-sm">No critical events found in timeline</p>
-                              </div>
-                            )}
+                              <p className="text-zinc-300 text-sm mt-1">{getHumanReadableDescription(log)}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {logLines.filter(log => log.important).length === 0 && (
+                          <div className="pl-4">
+                            <p className="text-zinc-400 text-sm">No critical events found in timeline</p>
                           </div>
                         )}
                       </div>
@@ -348,61 +600,23 @@ const formatNarrative = (narrative: string) => {
                       <ChevronDown className="h-5 w-5 text-zinc-500" />
                     )}
                   </div>
-                  {expandedSection === "why-care" && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="mt-3 text-zinc-300 space-y-3"
-                    >
-                      {logLines.filter(log => log.important).length > 0 ? (
-                        <>
-                          <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4">
-                            <h3 className="text-red-400 font-medium mb-2 flex items-center">
-                              <AlertCircle className="h-4 w-4 mr-2" />
-                              Security Risk Detected
-                            </h3>
-                            <p className="text-zinc-300">
-                              The log analysis shows potential security concerns that require attention. 
-                              These patterns may indicate unauthorized access attempts to your systems.
-                            </p>
-                          </div>
-
-                          <div className="bg-zinc-800/70 rounded-lg p-4 space-y-2">
-                            <h3 className="text-white font-medium">Recommended Actions:</h3>
-                            <ul className="list-disc pl-5 space-y-1 text-zinc-300">
-                              <li>Review all successful logins from unusual locations</li>
-                              <li>Enforce multi-factor authentication for all users</li>
-                              <li>Consider implementing IP-based access controls</li>
-                              <li>Check for any data exfiltration from compromised accounts</li>
-                              <li>Update your security incident response plan</li>
-                            </ul>
-                          </div>
-                        </>
-                      ) : (
-                        <p>
-                          No critical security events were detected in the logs. Continue monitoring for any unusual activities.
-                        </p>
-                      )}
-                    </motion.div>
-                  )}
+                  {expandedSection === "why-care" && renderWhyCareSection(riskLevel, logLines.filter(log => log.important))}
                 </div>
 
                 {/* Related Incidents Section */}
                 <div>
                   <div
                     className="flex items-center justify-between cursor-pointer"
-                    onClick={() => toggleSection("related")}
+                    onClick={() => toggleSection("recommendations")}
                   >
                     <h2 className="text-lg font-semibold text-white">Related Incidents</h2>
-                    {expandedSection === "related" ? (
+                    {expandedSection === "recommendations" ? (
                       <ChevronUp className="h-5 w-5 text-zinc-500" />
                     ) : (
                       <ChevronDown className="h-5 w-5 text-zinc-500" />
                     )}
                   </div>
-                  {expandedSection === "related" && (
+                  {expandedSection === "recommendations" && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}

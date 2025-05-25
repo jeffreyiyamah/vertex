@@ -1,141 +1,222 @@
 // lib/normalize.ts
 
-/**
- * The shape of a normalized log record for Vertex.
- */
 export interface VertexLog {
-  timestamp: string;    // ISO or parseable timestamp
-  user: string;         // username performing the action
-  ip: string;           // source IP address
-  event: string;        // normalized event code (e.g. "login_success")
-  detail: string;       // human-readable detail or message
+  timestamp: string;
+  user: string;
+  ip: string;
+  event: string;
+  detail: string;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  category?: 'authentication' | 'authorization' | 'data_access' | 'infrastructure' | 'administrative';
 }
 
 /**
- * Convert raw CloudTrail (and generic) records into a consistent VertexLog[] array.
+ * Enhanced normalization with better event classification
  */
 export function normalize(records: any[] | Record<string, any>): VertexLog[] {
   const arr = Array.isArray(records) ? records : [records];
 
   return arr.map((r) => {
-    if (r.eventType === "AwsCloudTrailInsight") {
-      return {
-        timestamp: r.eventTime || '',
-        user: "CloudTrail Insights",
-        ip: "AWS Internal",
-        event: r.insightDetails?.eventName || 'insight_event',
-        detail: `API call rate insight: ${r.insightDetails?.state || 'unknown'} - ${r.insightDetails?.insightType || ''}`
-      };
-    }
-
-    // Handle Network Activity events
-    if (r.eventCategory === "NetworkActivity") {
-      return {
-        timestamp: r.eventTime || '',
-        user: r.userIdentity?.userName || r.userIdentity?.type || 'network_user',
-        ip: r.sourceIPAddress || r.vpcEndpointId || 'vpc_internal',
-        event: 'network_activity',
-        detail: `${r.eventName || 'network_event'} via ${r.vpcEndpointId || 'VPC endpoint'}`
-      };
-    }
-
-    // Handle Data events (S3, Lambda, DynamoDB operations)
-    if (r.eventCategory === "Data") {
-      const resourceType = r.resources?.[0]?.type || 'unknown_resource';
-      return {
-        timestamp: r.eventTime || '',
-        user: r.userIdentity?.userName || r.userIdentity?.type || 'data_user',
-        ip: r.sourceIPAddress || r.userIdentity?.invokedBy || 'aws_service',
-        event: 'data_event',
-        detail: `${r.eventName || 'data_operation'} on ${resourceType.replace('AWS::', '')}`
-      };
-    }
-    // Base fields
+    // Extract base fields
     const timestamp = r.eventTime ?? r.timestamp ?? '';
-    const user = r.userIdentity?.userName ?? r.userName ?? r.username ?? '';
+    const user = extractUser(r);
     const ip = r.sourceIPAddress ?? r.sourceIp ?? r.ip ?? '';
+    
+    // Enhanced event normalization
+    const { eventCode, detail, severity, category } = normalizeEvent(r);
 
-    // Derive normalized event code and detail
-    let eventCode = r.eventName ?? r.event ?? '';
-    let detail: string;
-
-    switch (r.eventName) {
-      case 'ConsoleLogin':
-        if (r.responseElements?.ConsoleLogin === 'Success') {
-          eventCode = 'login_success';
-          detail = r.additionalEventData?.MFAUsed
-            ? `MFA used: ${r.additionalEventData.MFAUsed}`
-            : 'Login succeeded';
-        } else {
-          eventCode = 'login_failed';
-          detail = r.additionalEventData?.ErrorMessage || 'Login failed';
-        }
-        break;
-
-      case 'ConsoleLoginFailure':
-        eventCode = 'login_failed';
-        detail = r.additionalEventData?.ErrorMessage || 'Login failed';
-        break;
-
-      case 'AddMFADevice':
-        eventCode = 'mfa_added';
-        detail = r.requestParameters?.serialNumber
-          ? `MFA device added: ${r.requestParameters.serialNumber}`
-          : 'MFA device added';
-        break;
-
-      case 'DeleteMFADevice':
-        eventCode = 'mfa_removed';
-        detail = r.requestParameters?.serialNumber
-          ? `MFA device removed: ${r.requestParameters.serialNumber}`
-          : 'MFA device removed';
-        break;
-
-      case 'AssumeRole':
-        eventCode = 'role_assumed';
-        detail = r.requestParameters?.roleSessionName
-          ? `Role assumed: ${r.requestParameters.roleSessionName}`
-          : r.requestParameters?.roleArn || 'Role assumed';
-        break;
-
-      default:
-        detail = r.additionalEventData?.ErrorMessage
-          ?? r.additionalEventData?.LoginTo
-          ?? r.message
-          ?? '';
-    }
-
-    return { timestamp, user, ip, event: eventCode, detail };
+    return { 
+      timestamp, 
+      user, 
+      ip, 
+      event: eventCode, 
+      detail,
+      severity,
+      category
+    };
   });
 }
 
-/**
- * Capitalize the first letter of a string safely.
- */
-export function capitalize(s: string): string {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+function extractUser(record: any): string {
+  // Handle different user identity formats
+  if (record.userIdentity) {
+    const identity = record.userIdentity;
+    
+    // Root user
+    if (identity.type === 'Root') {
+      return 'Root';
+    }
+    
+    // IAM User
+    if (identity.userName) {
+      return identity.userName;
+    }
+    
+    // Assumed Role
+    if (identity.type === 'AssumedRole' && identity.arn) {
+      const roleMatch = identity.arn.match(/assumed-role\/([^\/]+)\/(.+)/);
+      if (roleMatch) {
+        return `${roleMatch[2]} (${roleMatch[1]})`;
+      }
+    }
+    
+    // AWS Service
+    if (identity.type === 'AWSService') {
+      return identity.invokedBy || 'AWSService';
+    }
+  }
+  
+  return record.userName ?? record.username ?? record.user ?? 'unknown';
 }
 
+function normalizeEvent(record: any): {
+  eventCode: string;
+  detail: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  category: 'authentication' | 'authorization' | 'data_access' | 'infrastructure' | 'administrative';
+} {
+  const eventName = record.eventName ?? record.event ?? '';
+  
+  switch (eventName) {
+    case 'ConsoleLogin':
+      if (record.responseElements?.ConsoleLogin === 'Success') {
+        return {
+          eventCode: 'login_success',
+          detail: record.additionalEventData?.MFAUsed 
+            ? `Console login with MFA: ${record.additionalEventData.MFAUsed}`
+            : 'Console login succeeded',
+          severity: 'low',
+          category: 'authentication'
+        };
+      } else {
+        return {
+          eventCode: 'login_failed',
+          detail: `Console login failed: ${record.additionalEventData?.ErrorMessage || 'Authentication failure'}`,
+          severity: 'high',
+          category: 'authentication'
+        };
+      }
 
+    case 'ConsoleLoginFailure':
+      return {
+        eventCode: 'login_failed',
+        detail: `Console login failed: ${record.additionalEventData?.ErrorMessage || 'Authentication failure'}`,
+        severity: 'high',
+        category: 'authentication'
+      };
+
+    case 'AssumeRole':
+      return {
+        eventCode: 'role_assumed',
+        detail: `Role assumed: ${record.requestParameters?.roleArn || 'Unknown role'}`,
+        severity: 'medium',
+        category: 'authorization'
+      };
+
+    case 'RunInstances':
+      return {
+        eventCode: 'instance_created',
+        detail: `EC2 instance launched: ${record.requestParameters?.instanceType || 'unknown type'} (${record.responseElements?.instancesSet?.items?.[0]?.instanceId || 'unknown ID'})`,
+        severity: 'medium',
+        category: 'infrastructure'
+      };
+
+    case 'CreateBucket':
+      return {
+        eventCode: 'bucket_created',
+        detail: `S3 bucket created: ${record.requestParameters?.bucketName || 'unknown name'}`,
+        severity: 'medium',
+        category: 'infrastructure'
+      };
+
+    case 'PutObject':
+      const isCloudTrailLog = record.userIdentity?.invokedBy === 'cloudtrail.amazonaws.com';
+      return {
+        eventCode: isCloudTrailLog ? 'log_archived' : 'file_uploaded',
+        detail: isCloudTrailLog 
+          ? `CloudTrail log archived: ${record.requestParameters?.key?.split('/').pop() || 'log file'}`
+          : `File uploaded to S3: ${record.requestParameters?.key || 'unknown file'} to ${record.requestParameters?.bucketName || 'unknown bucket'}`,
+        severity: isCloudTrailLog ? 'low' : 'medium',
+        category: isCloudTrailLog ? 'administrative' : 'data_access'
+      };
+
+    case 'CreateKey':
+      return {
+        eventCode: 'encryption_key_created',
+        detail: `KMS key created: ${record.requestParameters?.description || 'No description provided'}`,
+        severity: record.userIdentity?.type === 'Root' ? 'medium' : 'low',
+        category: 'administrative'
+      };
+
+    case 'GetUserPolicy':
+      return {
+        eventCode: 'policy_accessed',
+        detail: `User policy accessed: ${record.requestParameters?.policyName || 'unknown policy'} for user ${record.requestParameters?.userName || 'unknown user'}`,
+        severity: 'low',
+        category: 'authorization'
+      };
+
+    case 'AuthorizeSecurityGroupIngress':
+      const port = record.requestParameters?.ipPermissions?.items?.[0]?.fromPort;
+      const cidr = record.requestParameters?.ipPermissions?.items?.[0]?.ipRanges?.items?.[0]?.cidrIp;
+      return {
+        eventCode: 'firewall_rule_added',
+        detail: `Security group rule added: Allow port ${port || 'unknown'} from ${cidr || 'unknown CIDR'}`,
+        severity: 'medium',
+        category: 'infrastructure'
+      };
+
+    case 'PutConfigRule':
+      return {
+        eventCode: 'compliance_rule_created',
+        detail: `AWS Config rule created: ${record.requestParameters?.configRule?.configRuleName || 'unknown rule'}`,
+        severity: 'low',
+        category: 'administrative'
+      };
+
+    case 'CreateNotebookInstance':
+      return {
+        eventCode: 'notebook_created',
+        detail: `SageMaker notebook created: ${record.requestParameters?.notebookInstanceName || 'unknown name'} (${record.requestParameters?.instanceType || 'unknown type'})`,
+        severity: 'low',
+        category: 'infrastructure'
+      };
+
+    default:
+      return {
+        eventCode: eventName || 'unknown_event',
+        detail: record.additionalEventData?.ErrorMessage 
+          ?? record.message 
+          ?? `${eventName} event occurred`,
+        severity: 'low',
+        category: 'administrative'
+      };
+  }
+}
+
+/**
+ * Enhanced humanization with better context
+ */
 export function humanize(log: VertexLog): string {
   const user = capitalize(log.user) || 'Unknown user';
   const ip = log.ip || 'unknown IP';
-  const detail = log.detail;
-
+  
+  // Use the detail field for more descriptive text
+  if (log.detail) {
+    return `${user} from ${ip}: ${log.detail}`;
+  }
+  
+  // Fallback to basic format
   switch (log.event) {
     case 'login_success':
-      return `${user} from ${ip} successfully logged in${detail ? ` (${detail})` : ''}.`;
+      return `${user} from ${ip} successfully logged in.`;
     case 'login_failed':
-      return `${user} from ${ip} failed to log in${detail ? `: ${detail}` : ''}.`;
-    case 'mfa_added':
-      return detail;
-    case 'mfa_removed':
-      return detail;
-    case 'role_assumed':
-      return detail;
+      return `${user} from ${ip} failed to log in.`;
     default:
-      return detail
-        ? `${user} from ${ip} triggered ${log.event}: ${detail}.`
-        : `${user} from ${ip} triggered ${log.event}.`;
+      return `${user} from ${ip} triggered ${log.event.replace('_', ' ')}.`;
   }
+}
+
+export function capitalize(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 }
